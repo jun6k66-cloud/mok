@@ -348,6 +348,20 @@
                 </div>
             </div>
 
+            <!-- 추가 에디션 즐기기 버튼 카드 -->
+            <div class="bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800 flex flex-col gap-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🚀</span>
+                    <h3 class="font-bold text-slate-200 text-sm">보너스 콘텐츠</h3>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    다른 스타일의 특별한 에디션과 추가 콘텐츠를 경험해 보시겠습니까? 아래 단추를 눌러 전용 놀이터로 이동할 수 있습니다.
+                </p>
+                <a href="https://jun6k66-cloud.github.io/dd/" target="_blank" class="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-extrabold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-2 shadow-md border border-indigo-500/50">
+                    <i class="fa-solid fa-rocket animate-bounce"></i> 추가 에디션 즐기기
+                </a>
+            </div>
+
         </div>
     </main>
 
@@ -1614,6 +1628,7 @@
             return totalScore;
         }
 
+        // 라인 상의 돌 개수 세기
         function countSequenceInLine(r, c, dr, dc, targetColor) {
             let count = 1;
             let openEnds = 0;
