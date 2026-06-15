@@ -705,7 +705,25 @@
             // 대시보드 및 리스트 출력
             updateDashboard();
             renderLessonList();
-            loadLesson(0);
+
+            // 지금까지 풀지 않은 첫 번째 스테이지 자동 탐색 후 로드
+            const completed = window.state.userProgress.completedLessons || [];
+            let firstUnsolvedId = 0;
+            for (let i = 0; i < 50; i++) {
+                if (!completed.includes(i)) {
+                    firstUnsolvedId = i;
+                    break;
+                }
+            }
+            // 50개 스테이지를 모두 깼다면, 50 이후의 무한 문제 중 안 깬 거 찾기
+            if (completed.length >= 50) {
+                firstUnsolvedId = 50;
+                while (completed.includes(firstUnsolvedId)) {
+                    firstUnsolvedId++;
+                }
+            }
+
+            loadLesson(firstUnsolvedId);
 
             // 로딩 오버레이 비활성화
             const loadingOverlay = document.getElementById('sync-loading');
@@ -1016,6 +1034,9 @@
         window.switchTab = function(tabName) {
             window.state.currentTab = tabName;
             
+            // 컴퓨터 대결을 비롯한 다른 탭으로 넘어갈 때 힌트 가이드 레이어를 완전히 지웁니다.
+            document.getElementById('board-guides').innerHTML = ''; 
+
             document.querySelectorAll('nav button').forEach(btn => {
                 btn.className = "px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all duration-200 text-slate-400 hover:text-white";
             });
@@ -1482,6 +1503,8 @@
 
         window.startAIGame = function() {
             resetBoardState();
+            // 컴퓨터와 대결을 시작할 때, 연습장에 남아있던 모든 가이드라인 그래픽을 강제로 지웁니다.
+            document.getElementById('board-guides').innerHTML = ''; 
             window.state.aiModeActive = true;
             window.state.gameActive = true;
             window.state.currentPlayer = 1;
