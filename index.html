@@ -119,12 +119,12 @@
         </div>
     </header>
 
-    <!-- 동기화 및 클라우드 로딩 오버레이 -->
+    <!-- 동기화 및 클라우드 로딩 오버레이 (로컬 복원 대기) -->
     <div id="sync-loading" class="fixed inset-0 bg-slate-950/95 z-50 flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
         <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-800 h-14 w-14"></div>
         <div class="text-center">
             <h3 class="font-black text-slate-200 text-lg tracking-wider">학습 기록을 불러오는 중...</h3>
-            <p class="text-xs text-slate-500 mt-1 font-mono-code">Connecting to Omok Cloud Analysis Node</p>
+            <p class="text-xs text-slate-500 mt-1 font-mono-code">Connecting to LocalStorage Database</p>
         </div>
     </div>
 
@@ -235,7 +235,7 @@
             </div>
 
             <!-- 탭 2: AI 대국 설정 패널 -->
-            <div id="panel-play" class="bg-slate-900 rounded-2xl p-5 shadow-lg border border-slate-800 flex flex-col gap-4 hidden">
+            <div id="panel-play" class="bg-white/5 rounded-2xl p-5 shadow-lg border border-slate-800 flex flex-col gap-4 hidden">
                 <div>
                     <h2 class="text-lg font-bold text-slate-100 flex items-center justify-between">
                         <span class="flex items-center gap-2">
@@ -244,7 +244,7 @@
                         </span>
                         <span class="text-xs text-slate-500 font-medium">이기면 +150점 획득!</span>
                     </h2>
-                    <p class="text-xs text-slate-500 mt-1">인공지능과 대결하며 그동안 갈고닦은 실력을 발휘해 보세요.</p>
+                    <p class="text-xs text-slate-500 mt-1">인공지능과 대결하며 그동안 갈고닦은 실력을 발휘해 보세요. (실전 대결에서는 힌트가 제공되지 않습니다)</p>
                 </div>
 
                 <!-- 설정 카드 -->
@@ -348,20 +348,12 @@
                 </div>
             </div>
 
-            <!-- 기기 연동을 위한 클라우드 고유 ID 섹션 -->
-            <div class="bg-slate-950 text-slate-500 rounded-xl p-3 border border-slate-800 text-[10px] flex justify-between items-center font-mono-code">
-                <span class="font-semibold flex items-center gap-1">
-                    <i class="fa-solid fa-server text-indigo-400"></i> 내 학습 ID 고유번호:
-                </span>
-                <span id="cloud-user-id" class="text-slate-300 font-bold bg-slate-900 px-2 py-1 rounded border border-slate-800">Loading...</span>
-            </div>
-
         </div>
     </main>
 
     <!-- 푸터 -->
     <footer class="bg-slate-950 border-t border-slate-900 py-4 mt-8 text-center text-xs text-slate-500 font-mono-code">
-        <p>© 2026 OMOK 배움 교실 - 누구나 재미있게 배우는 오목 교과서</p>
+        <p>© 2026 오목 배움터. Licensed under the Apache License 2.0.</p>
     </footer>
 
     <!-- 알림 및 착수 완료 토스트 -->
@@ -386,34 +378,12 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (Modular Imports) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global Firebase Configuration
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'omok-learning-academy';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : {
-                apiKey: "",
-                authDomain: "mock-domain.firebaseapp.com",
-                projectId: "mock-project",
-                storageBucket: "mock-bucket",
-                messagingSenderId: "12345",
-                appId: "1:12345:web:mock"
-            };
-
-        // Firebase APP & DB Init
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // 오목판 기본 상수
+    <!-- 로컬 저장소 및 오목 연산 제어 스크립트 -->
+    <script>
+        // 오목판 기본 격자 크기 (15x15)
         const BOARD_SIZE = 15;
 
-        // 클라우드와 결합할 프로페셔널 버전 상태 객체
+        // 로컬 상태 객체 정의
         window.state = {
             currentTab: 'learn',
             board: Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(0)),
@@ -428,7 +398,7 @@
             aiDifficulty: 'easy',
             hintUsed: false, // 25단계 이상 힌트 활성화 여부
 
-            // 사용자 진척도 데이터 (Firestore와 동기화)
+            // 사용자 진척도 데이터 (로컬 스토리지 자동 연동)
             userProgress: {
                 exp: 0,
                 level: 1,
@@ -437,8 +407,7 @@
                 completedLessons: [], // 완료한 레슨 ID 목록
                 aiWins: 0,
                 aiGames: 0
-            },
-            currentUserId: null
+            }
         };
 
         // 50가지 전술 세트 동적 빌드 함수
@@ -703,64 +672,47 @@
             }
         }
 
-        // Firebase 연동 초기화
-        const initAuthAndSync = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Firebase Auth Exception. Falling Back: ", error);
-                await signInAnonymously(auth);
-            }
-        };
-
-        // 데이터베이스 실시간 싱크 및 세션 판독
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                window.state.currentUserId = user.uid;
-                document.getElementById('cloud-user-id').textContent = user.uid;
-                
-                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'progress', 'status');
+        // 로컬 저장소 기반 데이터 복원 및 싱크
+        function initLocalProgress() {
+            const saved = localStorage.getItem('omok_pro_academy_progress');
+            if (saved) {
                 try {
-                    const docSnap = await getDoc(docRef);
-                    if (docSnap.exists()) {
-                        window.state.userProgress = {
-                            ...window.state.userProgress,
-                            ...docSnap.data()
-                        };
-                        checkDailyStreak();
-                    } else {
-                        const todayStr = getTodayString();
-                        window.state.userProgress = {
-                            exp: 0,
-                            level: 1,
-                            streak: 1,
-                            lastActiveDate: todayStr,
-                            completedLessons: [],
-                            aiWins: 0,
-                            aiGames: 0
-                        };
-                        await setDoc(docRef, window.state.userProgress);
+                    window.state.userProgress = JSON.parse(saved);
+                    // 완료 미션 배열이 깨졌을 경우 방어 처리
+                    if (!window.state.userProgress.completedLessons) {
+                        window.state.userProgress.completedLessons = [];
                     }
-                    
-                    updateDashboard();
-                    renderLessonList();
-                    loadLesson(0);
-                    
                 } catch (e) {
-                    console.error("Cloud Node Offline. Running Safe Local Memory Mode: ", e);
-                    updateDashboard();
-                    renderLessonList();
-                    loadLesson(0);
-                } finally {
-                    const loadingOverlay = document.getElementById('sync-loading');
-                    loadingOverlay.classList.add('opacity-0', 'pointer-events-none');
+                    console.error("로컬 데이터를 불러오는 중 오류 발생:", e);
                 }
+            } else {
+                const todayStr = getTodayString();
+                window.state.userProgress = {
+                    exp: 0,
+                    level: 1,
+                    streak: 1,
+                    lastActiveDate: todayStr,
+                    completedLessons: [],
+                    aiWins: 0,
+                    aiGames: 0
+                };
+                localStorage.setItem('omok_pro_academy_progress', JSON.stringify(window.state.userProgress));
             }
-        });
+            
+            // 스트릭 연속 공부 일수 체크
+            checkDailyStreak();
+            
+            // 대시보드 및 리스트 출력
+            updateDashboard();
+            renderLessonList();
+            loadLesson(0);
+
+            // 로딩 오버레이 비활성화
+            const loadingOverlay = document.getElementById('sync-loading');
+            if (loadingOverlay) {
+                loadingOverlay.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
 
         // 수련 지속 트래커
         function checkDailyStreak() {
@@ -786,7 +738,7 @@
                 window.state.userProgress.streak = 1;
             }
             window.state.userProgress.lastActiveDate = today;
-            saveProgressToCloud();
+            saveProgressToLocal();
         }
 
         function getTodayString() {
@@ -794,18 +746,17 @@
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
 
-        async function saveProgressToCloud() {
-            if (!window.state.currentUserId) return;
-            const docRef = doc(db, 'artifacts', appId, 'users', window.state.currentUserId, 'progress', 'status');
+        // 로컬 저장소 저장 모듈
+        function saveProgressToLocal() {
             try {
-                await setDoc(docRef, window.state.userProgress);
+                localStorage.setItem('omok_pro_academy_progress', JSON.stringify(window.state.userProgress));
             } catch (err) {
-                console.error("Sync Stream Error: ", err);
+                console.error("Local Save Error: ", err);
             }
         }
 
         // 수읽기 공인 기보 레이팅 점수(EXP) 가산 및 기원 자격 심사
-        async function rewardEXP(amount, reason) {
+        function rewardEXP(amount, reason) {
             const prevLevel = window.state.userProgress.level;
             window.state.userProgress.exp += amount;
             
@@ -819,7 +770,7 @@
                 leveledUp = true;
             }
 
-            await saveProgressToCloud();
+            saveProgressToLocal();
             updateDashboard();
 
             if (leveledUp) {
@@ -964,7 +915,7 @@
                     card.innerHTML = `
                         <div class="flex-grow">
                             <div class="flex justify-between items-center">
-                                <span class="text-[9px] font-extrabold text-indigo-400 bg-indigo-950/40 px-2 py-0.5 rounded-md tracking-wider">무한 수련</span>
+                                <span class="text-[9px] font-extrabold text-indigo-400 bg-indigo-950/40 px-2 py-0.5 rounded-md tracking-wider">무한 연습</span>
                                 <span class="text-[9px] text-slate-500 font-mono-code">LV: ${infId + 1}</span>
                             </div>
                             <h3 class="font-bold text-slate-300 mt-1 text-xs sm:text-sm">${infLesson.title}</h3>
@@ -1172,7 +1123,7 @@
             }
 
             window.state.hintUsed = true;
-            saveProgressToCloud();
+            saveProgressToLocal();
             updateDashboard();
             renderGuides();
             updateHintButtonUI();
@@ -1182,12 +1133,15 @@
             document.getElementById('duo-speech').textContent = "요청에 따라 정답 힌트가 바둑판에 표시되었습니다. 단, 이 문제를 맞추고 얻는 보상 점수는 절반만 올라갑니다.";
         }
 
-        // 가이드선 마킹 시각화
+        // 가이드선 마킹 시각화 (중요: 컴퓨터와 대결 모드 또는 전술 학습이 아닌 탭일 때는 절대 힌트를 표기하지 않도록 완벽 보완)
         function renderGuides() {
             const guideContainer = document.getElementById('board-guides');
             guideContainer.innerHTML = '';
 
-            if (window.state.currentTab !== 'learn') return;
+            // 확실하게 '전술 문제 연습' 탭이 아니거나 컴퓨터와 대결 중일 때는 힌트 기능을 완전 원천 차단합니다.
+            if (window.state.currentTab !== 'learn' || window.state.aiModeActive) {
+                return;
+            }
 
             // 스테이지 25 (ID 24) 이상이며 힌트를 구매하지 않은 경우 가이드라인 차단
             if (window.state.currentLessonId >= 24 && !window.state.hintUsed) {
@@ -1326,6 +1280,7 @@
             }
         }
 
+        // 바둑돌 놓기
         function placeStone(r, c, player) {
             window.state.board[r][c] = player;
             window.state.moveHistory.push({ r, c, player });
@@ -1665,6 +1620,7 @@
             return { count, openEnds };
         }
 
+        // 패턴 점수 계산
         function getPatternWeight(count, openEnds, isAttack) {
             if (count >= 5) return 1000000;
             if (count === 4) {
@@ -1701,7 +1657,7 @@
                     window.state.userProgress.aiGames += 1;
                     if (userWon) {
                         window.state.userProgress.aiWins += 1;
-                        saveProgressToCloud();
+                        saveProgressToLocal();
                         rewardEXP(150, "컴퓨터 격파 승리");
                         
                         iconBg.className = "w-16 h-16 rounded-full bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-center mb-4";
@@ -1710,7 +1666,7 @@
                         desc.textContent = "컴퓨터의 수비망을 멋지게 뚫어내고 승리하였습니다! 보상으로 +150점을 드립니다.";
                         document.getElementById('duo-speech').textContent = "엄청납니다! 컴퓨터 인공지능을 격파하셨군요. 전술 실력이 아주 뛰어납니다.";
                     } else {
-                        saveProgressToCloud();
+                        saveProgressToLocal();
                         iconBg.className = "w-16 h-16 rounded-full bg-rose-950/40 border border-rose-500/30 flex items-center justify-center mb-4";
                         icon.className = "fa-solid fa-robot text-rose-400 text-3xl animate-bounce";
                         title.textContent = "컴퓨터의 승리";
@@ -1726,7 +1682,7 @@
                 primaryBtn.textContent = "게임 다시하기";
             } else if (resultType === 'ai-win') {
                 window.state.userProgress.aiGames += 1;
-                saveProgressToCloud();
+                saveProgressToLocal();
                 
                 iconBg.className = "w-16 h-16 rounded-full bg-rose-950/40 border border-rose-500/30 flex items-center justify-center mb-4";
                 icon.className = "fa-solid fa-brain text-rose-400 text-3xl animate-bounce";
@@ -1780,9 +1736,11 @@
             }
         }
 
-        // 초기 시작 시동 제어
-        createBoardGrid();
-        initAuthAndSync();
+        // 초기 시작 실행 주동 제어 (DOMContentLoaded 대용 온로드 즉시 동작)
+        window.onload = function() {
+            createBoardGrid();
+            initLocalProgress();
+        };
     </script>
 </body>
 </html>
