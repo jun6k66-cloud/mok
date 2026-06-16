@@ -70,7 +70,7 @@
     <header class="bg-slate-900 border-b border-slate-800 text-white shadow-lg sticky top-0 z-40">
         <div class="max-w-6xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-slate-950 rounded-lg flex items-center justify-center border border-slate-700 shadow-inner">
+                <div class="w-10 h-10 bg-slate-955 rounded-lg flex items-center justify-center border border-slate-700 shadow-inner">
                     <div class="w-5 h-5 bg-gradient-to-br from-neutral-100 to-neutral-400 rounded-full shadow-md border border-white"></div>
                 </div>
                 <div>
@@ -216,8 +216,10 @@
                 </div>
 
                 <!-- 단계 선택 리스트 (다크 테마 스크롤) -->
-                <div id="lesson-list-container" class="space-y-2.5 max-h-[280px] overflow-y-auto pr-1 custom-scroll">
-                    <!-- JS로 리스트 동적 렌더링 -->
+                <div class="flex flex-col gap-2.5">
+                    <div id="lesson-list-container" class="space-y-2.5 max-h-[240px] overflow-y-auto pr-1 custom-scroll">
+                        <!-- JS로 리스트 동적 렌더링 -->
+                    </div>
                 </div>
 
                 <!-- 전술 연습용 피드백 상자 -->
@@ -411,6 +413,7 @@
             playerColor: 'black',
             aiDifficulty: 'easy',
             hintUsed: false, // 25단계 이상 힌트 활성화 여부
+            currentInfiniteLesson: null, // 현재 활성화된 생성형 무한 레슨 데이터
 
             // 사용자 진척도 데이터 (로컬 스토리지 자동 연동)
             userProgress: {
@@ -564,66 +567,199 @@
 
         const lessons = create50Lessons();
 
-        // 50단계 이상 무한 문제 실시간 생성 엔진 (중복 없이 실시간 좌표 변환)
-        function generateInfiniteLesson(lessonId) {
+        // 50단계 이상 무한 문제 - 클릭할 때마다 100% 실시간 무작위 상황 조립
+        function generateFreshInfiniteLesson(lessonId) {
             const directions = [
                 { dr: 0, dc: 1, name: "가로" },
                 { dr: 1, dc: 0, name: "세로" },
-                { dr: 1, dc: 1, name: "대각선" }
+                { dr: 1, dc: 1, name: "우하향 대각선" },
+                { dr: 1, dc: -1, name: "좌하향 대각선" }
             ];
 
-            const seed = lessonId * 17;
-            const dir = directions[seed % directions.length];
-            const startR = 4 + (seed % 6);
-            const startC = 4 + ((seed + 3) % 6);
+            // 단계 번호 (50 -> 1단계, 51 -> 2단계)
+            const stepNum = lessonId - 49;
+            const dir = directions[Math.floor(Math.random() * directions.length)];
 
-            const isJumpType = lessonId % 2 === 1;
+            // 오목판 경계를 벗어나지 않는 안전한 중앙 영역 좌표 추출
+            const startR = 3 + Math.floor(Math.random() * 8);
+            const startC = 3 + Math.floor(Math.random() * 8);
 
-            if (isJumpType) {
-                return {
-                    id: lessonId,
-                    category: "infinite",
-                    title: `무한 연습: AI가 만든 전술 문제 #${lessonId + 1}`,
-                    mission: `[실시간 인공지능 문제] ${dir.name} 방향의 끊긴 연결 고리를 정확히 파악하여 오목의 빈곳을 채워보세요!`,
-                    initialStones: [
-                        { r: startR, c: startC, color: 1 },
-                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, color: 1 }
-                    ],
-                    targetMoves: [
-                        { r: startR + dir.dr, c: startC + dir.dc }
-                    ],
-                    guides: [
-                        { r: startR + dir.dr, c: startC + dir.dc, text: "빈곳 채우기" }
-                    ]
-                };
-            } else {
-                return {
-                    id: lessonId,
-                    category: "infinite",
-                    title: `무한 연습: AI가 만든 전술 문제 #${lessonId + 1}`,
-                    mission: `[실시간 인공지능 문제] ${dir.name} 방향으로 연결을 잘 이어서 상대방이 수비할 수 없는 상태를 만드세요.`,
-                    initialStones: [
+            let initialStones = [];
+            let targetMoves = [];
+            let guides = [];
+            let title = `무한 연습 ${stepNum}단계`;
+            let mission = "";
+
+            // 각 단계별로 고유한 무작위 테마 배정
+            switch(stepNum) {
+                case 1: // 기초 공격 - 열린 3개 만들기
+                    mission = `[무한 1단계: 기초 공격] 검은 돌 차례입니다. ${dir.name} 방향으로 두 돌 옆에 연결하여 양쪽이 뚫린 '열린 3개'를 완성해 보세요!`;
+                    initialStones = [
                         { r: startR, c: startC, color: 1 },
                         { r: startR + dir.dr, c: startC + dir.dc, color: 1 }
-                    ],
-                    targetMoves: [
+                    ];
+                    targetMoves = [
                         { r: startR - dir.dr, c: startC - dir.dc },
                         { r: startR + dir.dr * 2, c: startC + dir.dc * 2 }
-                    ],
-                    guides: [
-                        { r: startR - dir.dr, c: startC - dir.dc, text: "오목 연결점" },
-                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, text: "오목 연결점" }
-                    ]
-                };
+                    ];
+                    guides = [
+                        { r: startR - dir.dr, c: startC - dir.dc, text: "오목 공격점" },
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, text: "반대 공격점" }
+                    ];
+                    break;
+                case 2: // 응용 공격 - 끊긴 3개 만들기
+                    mission = `[무한 2단계: 응용 공격] 검은 돌 차례입니다. ${dir.name} 방향으로 중간이 끊긴 대형입니다. 빈틈을 메워 '끊긴 3개'를 만들어 보세요!`;
+                    initialStones = [
+                        { r: startR, c: startC, color: 1 },
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, color: 1 }
+                    ];
+                    targetMoves = [
+                        { r: startR + dir.dr, c: startC + dir.dc }
+                    ];
+                    guides = [
+                        { r: startR + dir.dr, c: startC + dir.dc, text: "중앙 연결점" }
+                    ];
+                    break;
+                case 3: // 상대 수비 - 상대방 3목 차단하기
+                    mission = `[무한 3단계: 상대 수비] 상대방(하얀 돌)이 ${dir.name} 방향으로 3개를 나란히 두었습니다. 즉시 수비하여 상대방의 승리를 막으세요!`;
+                    initialStones = [
+                        { r: startR, c: startC, color: 2 },
+                        { r: startR + dir.dr, c: startC + dir.dc, color: 2 },
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, color: 2 }
+                    ];
+                    targetMoves = [
+                        { r: startR - dir.dr, c: startC - dir.dc },
+                        { r: startR + dir.dr * 3, c: startC + dir.dc * 3 }
+                    ];
+                    guides = [
+                        { r: startR - dir.dr, c: startC - dir.dc, text: "방패 막기" },
+                        { r: startR + dir.dr * 3, c: startC + dir.dc * 3, text: "방패 막기" }
+                    ];
+                    break;
+                case 4: // 필승 공격 - 4목 연결 만들기
+                    mission = `[무한 4단계: 필승 공격] 검은 돌 차례입니다. 이미 3개의 검은 돌이 놓였습니다. ${dir.name} 방향으로 강력한 4목 공격망을 완성해 보세요!`;
+                    initialStones = [
+                        { r: startR, c: startC, color: 1 },
+                        { r: startR + dir.dr, c: startC + dir.dc, color: 1 },
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, color: 1 }
+                    ];
+                    targetMoves = [
+                        { r: startR - dir.dr, c: startC - dir.dc },
+                        { r: startR + dir.dr * 3, c: startC + dir.dc * 3 }
+                    ];
+                    guides = [
+                        { r: startR - dir.dr, c: startC - dir.dc, text: "결정타" },
+                        { r: startR + dir.dr * 3, c: startC + dir.dc * 3, text: "반대 결정타" }
+                    ];
+                    break;
+                case 5: // 끊긴 4목 연결
+                    mission = `[무한 5단계: 응용 공격] 중간 한 칸이 비어있는 ${dir.name} 방향의 4목 배치입니다. 빈 공간에 정확히 돌을 채워 승리 수순을 완성하세요!`;
+                    initialStones = [
+                        { r: startR, c: startC, color: 1 },
+                        { r: startR + dir.dr, c: startC + dir.dc, color: 1 },
+                        { r: startR + dir.dr * 3, c: startC + dir.dc * 3, color: 1 }
+                    ];
+                    targetMoves = [
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2 }
+                    ];
+                    guides = [
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, text: "수읽기 요충지" }
+                    ];
+                    break;
+                case 6: // 상대 수비 - 끊긴 3목 방어
+                    mission = `[무한 6단계: 응용 수비] 상대방(하얀 돌)이 ${dir.name} 방향으로 한 칸 떨어진 교묘한 3목을 짰습니다. 공격망 정중앙에 수비돌을 놓으세요!`;
+                    initialStones = [
+                        { r: startR, c: startC, color: 2 },
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, color: 2 }
+                    ];
+                    targetMoves = [
+                        { r: startR + dir.dr, c: startC + dir.dc }
+                    ];
+                    guides = [
+                        { r: startR + dir.dr, c: startC + dir.dc, text: "수비 급소" }
+                    ];
+                    break;
+                case 7: // 양수겸장 - 3-3 자리 찾기
+                    mission = `[무한 7단계: 양수겸장] 검은 돌 하나를 두어 가로와 세로 두 방향의 공격 길을 동시에 성립시키는 필승의 명당자리를 선점하십시오.`;
+                    initialStones = [
+                        { r: startR, c: startC - 1, color: 1 },
+                        { r: startR, c: startC - 2, color: 1 },
+                        { r: startR - 1, c: startC, color: 1 },
+                        { r: startR - 2, c: startC, color: 1 }
+                    ];
+                    targetMoves = [
+                        { r: startR, c: startC }
+                    ];
+                    guides = [
+                        { r: startR, c: startC, text: "교차 급소" }
+                    ];
+                    break;
+                case 8: // 복합 방해 차단
+                    mission = `[무한 8단계: 실전 수비] 백돌이 세로 및 가로에 복합적인 공격 흐름을 만들었습니다. 교차 요충지인 명당을 가로채서 백돌의 빌드를 차단하세요.`;
+                    initialStones = [
+                        { r: startR, c: startC - 1, color: 2 },
+                        { r: startR - 1, c: startC, color: 2 }
+                    ];
+                    targetMoves = [
+                        { r: startR, c: startC }
+                    ];
+                    guides = [
+                        { r: startR, c: startC, text: "동시 방어선" }
+                    ];
+                    break;
+                case 9: // 고난도 교차 공격
+                    mission = `[무한 9단계: 고난도 수읽기] 검은 돌을 교차 중심점에 배치하여 양방향 대각선 오목 공격 대형을 멋지게 활성화시켜 보세요!`;
+                    initialStones = [
+                        { r: startR - 1, c: startC - 1, color: 1 },
+                        { r: startR + 1, c: startC - 1, color: 1 }
+                    ];
+                    targetMoves = [
+                        { r: startR, c: startC }
+                    ];
+                    guides = [
+                        { r: startR, c: startC, text: "대각선 급소" }
+                    ];
+                    break;
+                case 10: // 마스터 챌린지 - 최종 수읽기
+                    mission = `[무한 10단계: 최종 보스] 극상의 무작위 훈련입니다. ${dir.name} 방향의 고밀도 포석을 확인하고, 오목 승리를 위한 마지막 최적의 수단 자리를 직접 공략해 내십시오!`;
+                    initialStones = [
+                        { r: startR, c: startC, color: 1 },
+                        { r: startR + dir.dr, c: startC + dir.dc, color: 1 },
+                        { r: startR + dir.dr * 3, c: startC + dir.dc * 3, color: 1 }
+                    ];
+                    targetMoves = [
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2 }
+                    ];
+                    guides = [
+                        { r: startR + dir.dr * 2, c: startC + dir.dc * 2, text: "마스터의 일침" }
+                    ];
+                    break;
             }
+
+            return {
+                id: lessonId,
+                category: "infinite",
+                title: title,
+                mission: mission,
+                initialStones: initialStones,
+                targetMoves: targetMoves,
+                guides: guides
+            };
         }
 
-        // 아이디로 레슨 객체 안전하게 조회
-        function getLessonById(id) {
+        // 아이디로 레슨 객체 안전하게 조회 (현재 진행 중인 무한 레슨과 ID 일치 확인)
+        function getLessonById(id, forceNew = false) {
             if (id < 50) {
                 return lessons[id];
             } else {
-                return generateInfiniteLesson(id);
+                // 동일한 무한 단계를 리셋하거나 재도전할 때는 기존 생성된 상태 보존
+                if (!forceNew && window.state.currentInfiniteLesson && window.state.currentInfiniteLesson.id === id) {
+                    return window.state.currentInfiniteLesson;
+                }
+                // 새롭게 클릭하거나 성공 시에만 100% 무작위 신규 상황 로드
+                const newLesson = generateFreshInfiniteLesson(id);
+                window.state.currentInfiniteLesson = newLesson;
+                return newLesson;
             }
         }
 
@@ -692,7 +828,6 @@
             if (saved) {
                 try {
                     window.state.userProgress = JSON.parse(saved);
-                    // 완료 미션 배열이 깨졌을 경우 방어 처리
                     if (!window.state.userProgress.completedLessons) {
                         window.state.userProgress.completedLessons = [];
                     }
@@ -720,7 +855,7 @@
             updateDashboard();
             renderLessonList();
 
-            // 지금까지 풀지 않은 첫 번째 스테이지 자동 탐색 후 로드
+            // 지금까지 풀지 않은 첫 번째 스테이지 자동 탐색 후 로드 (이어서 공부하기 시스템)
             const completed = window.state.userProgress.completedLessons || [];
             let firstUnsolvedId = 0;
             for (let i = 0; i < 50; i++) {
@@ -729,7 +864,7 @@
                     break;
                 }
             }
-            // 50개 스테이지를 모두 깼다면, 50 이후의 무한 문제 중 안 깬 거 찾기
+            // 50개 스테이지를 모두 깼다면, 무한 연습 1단계(50번)부터 복구 시작
             if (completed.length >= 50) {
                 firstUnsolvedId = 50;
                 while (completed.includes(firstUnsolvedId)) {
@@ -737,7 +872,8 @@
                 }
             }
 
-            loadLesson(firstUnsolvedId);
+            // 첫 진입 시 신규 무한 문제로 활성화
+            loadLesson(firstUnsolvedId, true);
 
             // 로딩 오버레이 비활성화
             const loadingOverlay = document.getElementById('sync-loading');
@@ -871,7 +1007,7 @@
 
             const completed = window.state.userProgress.completedLessons || [];
 
-            // 50개 레슨 순회 출력
+            // 50개 기본 레슨 순회 출력
             lessons.forEach(l => {
                 if (window.state.activeFilter !== 'all' && window.state.activeFilter !== l.category) {
                     return;
@@ -882,16 +1018,13 @@
 
                 const card = document.createElement('div');
                 card.id = `lesson-card-${l.id}`;
-                card.onclick = () => loadLesson(l.id);
-                
-                // 프로 아카데미 전문적인 스타일 기판 구성
+                card.onclick = () => loadLesson(l.id, false); // 고정형 문제는 일반 로드
                 card.className = `p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
                     isActive 
                     ? 'border-indigo-500 bg-slate-800 shadow-lg' 
                     : 'border-slate-800/80 hover:bg-slate-800 bg-slate-900/60'
                 }`;
 
-                // 쉬운 말 카테고리 태그 매핑
                 let displayCategory = '기초';
                 if (l.category === 'applied') displayCategory = '응용';
                 else if (l.category === 'defend') displayCategory = '수비';
@@ -919,25 +1052,21 @@
                 container.appendChild(card);
             });
 
-            // "무한" 필터일 경우에 무한 전술 마스터 단계도 가시성 부여
+            // 50단계 이후의 전용 "무한 연습 1~10단계" 리스트 출력
             if (window.state.activeFilter === 'all' || window.state.activeFilter === 'infinite') {
-                const infiniteBase = 50;
-                let activeInfiniteId = infiniteBase;
-                while (completed.includes(activeInfiniteId)) {
-                    activeInfiniteId++;
-                }
-
-                const startShow = Math.max(infiniteBase, activeInfiniteId - 2);
-                const endShow = activeInfiniteId + 5; 
-
-                for (let infId = startShow; infId <= endShow; infId++) {
-                    const infLesson = generateInfiniteLesson(infId);
+                const infiniteBaseId = 50;
+                
+                // 총 10개의 명확한 단계 배치
+                for (let i = 0; i < 10; i++) {
+                    const infId = infiniteBaseId + i;
+                    const stepNum = i + 1;
                     const isCompleted = completed.includes(infId);
                     const isActive = window.state.currentLessonId === infId;
 
                     const card = document.createElement('div');
                     card.id = `lesson-card-${infId}`;
-                    card.onclick = () => loadLesson(infId);
+                    // 클릭할 때마다 강제로(forceNew = true) 새로운 100% 무작위 문제 빌드 및 시작
+                    card.onclick = () => loadLesson(infId, true);
                     card.className = `p-3 rounded-xl border-2 border-dashed transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
                         isActive 
                         ? 'border-indigo-500 bg-slate-800 shadow-lg' 
@@ -948,9 +1077,9 @@
                         <div class="flex-grow">
                             <div class="flex justify-between items-center">
                                 <span class="text-[9px] font-extrabold text-indigo-400 bg-indigo-950/40 px-2 py-0.5 rounded-md tracking-wider">무한 연습</span>
-                                <span class="text-[9px] text-slate-500 font-mono-code">LV: ${infId + 1}</span>
+                                <span class="text-[9px] text-slate-500 font-mono-code">Step ${stepNum}</span>
                             </div>
-                            <h3 class="font-bold text-slate-300 mt-1 text-xs sm:text-sm">${infLesson.title}</h3>
+                            <h3 class="font-bold text-slate-300 mt-1 text-xs sm:text-sm">무한 연습 ${stepNum}단계</h3>
                         </div>
                         <div id="lesson-check-${infId}" class="w-5 h-5 rounded-full ${
                             isCompleted ? 'bg-emerald-500' : 'bg-slate-850'
@@ -1065,7 +1194,7 @@
 
             if (tabName === 'learn') {
                 window.state.aiModeActive = false;
-                loadLesson(window.state.currentLessonId);
+                loadLesson(window.state.currentLessonId, false); // 탭 이동 시에는 문제 재생성 금지
                 showToast("전술 문제 수련실이 열렸습니다.", "info");
                 document.getElementById('duo-speech').textContent = "50가지 기본·고급 전술 과제와 무한 연습 모드를 풀며 오목 실력을 쑥쑥 키워보세요.";
             } else if (tabName === 'play') {
@@ -1080,15 +1209,15 @@
             }
         }
 
-        // 레슨 선택 및 수강 개시
-        window.loadLesson = function(lessonId) {
+        // 레슨 선택 및 수강 개시 (forceNew 인자를 통해 무작위 재생성 통제)
+        window.loadLesson = function(lessonId, forceNew = false) {
             window.state.currentLessonId = lessonId;
             window.state.aiModeActive = false;
             window.state.hintUsed = false; // 새로운 레슨 시작 시 힌트 사용 내역 초기화
 
             renderLessonList();
 
-            const lesson = getLessonById(lessonId);
+            const lesson = getLessonById(lessonId, forceNew);
             document.getElementById('lesson-mission').textContent = lesson.mission;
 
             resetBoardState();
@@ -1183,7 +1312,7 @@
                 return;
             }
 
-            const lesson = getLessonById(window.state.currentLessonId);
+            const lesson = getLessonById(window.state.currentLessonId, false); // 리셋이나 재도전 고려해 forceNew = false
             const step = 100 / (BOARD_SIZE - 1);
 
             lesson.guides.forEach(guide => {
@@ -1214,7 +1343,7 @@
 
         window.resetBoard = function() {
             if (window.state.currentTab === 'learn') {
-                loadLesson(window.state.currentLessonId);
+                loadLesson(window.state.currentLessonId, false); // 판 초기화 시에는 동일한 무작위 문제 유지
             } else {
                 startAIGame();
             }
@@ -1282,7 +1411,7 @@
             }
 
             if (window.state.currentTab === 'learn') {
-                const lesson = getLessonById(window.state.currentLessonId);
+                const lesson = getLessonById(window.state.currentLessonId, false); // 진행 상황 연산이므로 forceNew = false
                 const isCorrect = lesson.targetMoves.some(target => target.r === r && target.c === c);
 
                 if (isCorrect) {
@@ -1500,6 +1629,7 @@
             showToast(`내가 놓을 바둑돌의 색상이 ${color === 'black' ? '검은 돌' : '하얀 돌'}로 지정되었습니다.`, "info");
         }
 
+        // AI 난이도 설정
         window.setAIDifficulty = function(diff) {
             window.state.aiDifficulty = diff;
             const btnEasy = document.getElementById('btn-difficulty-easy');
@@ -1701,7 +1831,7 @@
                         iconBg.className = "w-16 h-16 rounded-full bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-center mb-4";
                         icon.className = "fa-solid fa-trophy text-emerald-400 text-3xl";
                         title.textContent = "나의 멋진 승리!";
-                        desc.textContent = "컴퓨터의 수비망을 멋지게 뚫어내고 승리하였습니다! 보상으로 +150점을 드립니다.";
+                        desc.textContent = "컴퓨터의 수비망을 멋지게 뚫어내고 승리하였습니다! +150점을 드립니다.";
                         document.getElementById('duo-speech').textContent = "엄청납니다! 컴퓨터 인공지능을 격파하셨군요. 전술 실력이 아주 뛰어납니다.";
                     } else {
                         saveProgressToLocal();
@@ -1729,7 +1859,7 @@
                 document.getElementById('duo-speech').textContent = "상대방이 3개를 연속으로 만들려고 할 때, 한 칸 미리 길목을 차단하는 것이 정답입니다.";
                 primaryBtn.textContent = "대결 한 판 더!";
             } else if (resultType === 'learn-success') {
-                const currentLesson = getLessonById(window.state.currentLessonId);
+                const currentLesson = getLessonById(window.state.currentLessonId, false); // forceNew = false
                 let expReward = currentLesson.category === 'infinite' ? 30 : 50;
                 
                 // 힌트 패널티 적용
@@ -1765,10 +1895,9 @@
             closeModal();
             if (currentModalContext === 'learn-success') {
                 const nextLessonId = window.state.currentLessonId + 1;
-                loadLesson(nextLessonId);
+                // 성공하고 다음 단계로 진입할 때는 새로운 무작위 과제 생성을 위해 forceNew = true 적용
+                loadLesson(nextLessonId, true);
                 showToast(`No.${nextLessonId + 1} 전술 트레이닝을 시작합니다.`, "success");
-            } else if (window.state.aiModeActive) {
-                startAIGame();
             } else {
                 resetBoard();
             }
